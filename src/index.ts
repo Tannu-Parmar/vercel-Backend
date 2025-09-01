@@ -6,9 +6,20 @@ import morgan from "morgan";
 import multer from "multer";
 import { z } from "zod";
 import { Agent, run, user } from "@openai/agents";
+import connectDB from "./config/db";
+import User from "./model/User";
+import ExtractedData from "./model/ExtractedData"; // Fixed: removed .js extension
+
 const app: Application = express();
 const PORT = process.env.PORT || 3001;
 const upload = multer();
+
+// Connect to database
+try {
+  connectDB();
+} catch (error) {
+  console.error('Failed to connect to database:', error);
+}
 
 // Middlewares
 app.use(helmet()); // Security headers
@@ -85,8 +96,8 @@ const panCardInstructions = `You are an expert at extracting information from pa
        - Name as per PAN Card
        `;
 
-       // @ts-ignore
-const getAgentInstructions = (type: string, pageNumber: number) => {
+// Fixed function signature - removed @ts-ignore
+const getAgentInstructions = (type: string, pageNumber: number): string | undefined => {
   if (type === "passport") {
     if (pageNumber === 1) {
       return passportFrontPageInstructions;
@@ -100,9 +111,10 @@ const getAgentInstructions = (type: string, pageNumber: number) => {
       return aadhaarSecondPageInstructions;
     }
   }
+  return undefined;
 };
 
-const passPosrtFirstPageOutput = z.object({
+const passportFirstPageOutput = z.object({
   passportNumber: z.string().describe("passport number"),
   firstName: z.string().describe("first name"),
   lastName: z.string().describe("last name"),
@@ -117,7 +129,7 @@ const passPosrtFirstPageOutput = z.object({
   placeOfBirth: z.string().describe("place of birth"),
 });
 
-const passPosrtSecondPageOutput = z.object({
+const passportSecondPageOutput = z.object({
   fatherName: z.string().describe("father's name"),
   motherName: z.string().describe("mother's name"),
   address: z.string().describe("address"),
@@ -154,33 +166,55 @@ app.post(
     const base64Image = image.buffer.toString("base64");
     const dataUrl = `data:${image.mimetype};base64,${base64Image}`;
 
+    const instructions = getAgentInstructions("passport", pageNumber);
+    if (!instructions) {
+      return res.status(400).json({ error: "Invalid page number for passport." });
+    }
+
     const agent = new Agent({
       name: "Passport Extraction Agent",
-      instructions: getAgentInstructions("passport", pageNumber),
+      instructions: instructions,
       outputType:
-        pageNumber === 1 ? passPosrtFirstPageOutput : passPosrtSecondPageOutput,
+        pageNumber === 1 ? passportFirstPageOutput : passportSecondPageOutput,
       model: "gpt-5-mini-2025-08-07",
     });
 
-    const { finalOutput } = await run(agent, [
-      user([
-        {
-          type: "input_text",
-          text: "Extract all available passport information from this image. Return only JSON with no additional text.",
-        },
-        {
-          type: "input_image",
-          image: dataUrl,
-          // @ts-ignore - OpenAI agents library type issue
-          // image_url: base64Image,
-        },
-      ]),
-    ]);
+    try {
+      const { finalOutput } = await run(agent, [
+        user([
+          {
+            type: "input_text",
+            text: "Extract all available passport information from this image. Return only JSON with no additional text.",
+          },
+          {
+            type: "input_image",
+            image: dataUrl,
+          },
+        ]),
+      ]);
 
-    return res.json({
-      message: "Image extracted successfully",
-      data: finalOutput,
-    });
+      // Store extracted data in MongoDB
+      const extractedData = new ExtractedData({
+        documentType: 'passport',
+        pageNumber: pageNumber,
+        extractedData: finalOutput,
+        imageUrl: dataUrl // Store the base64 image
+      });
+
+      await extractedData.save();
+
+      return res.json({
+        message: "Image extracted and stored successfully",
+        data: finalOutput,
+        mongoId: extractedData._id
+      });
+    } catch (error) {
+      console.error('Error processing image:', error);
+      return res.status(500).json({ 
+        error: "Failed to process image",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
   }
 );
 
@@ -201,33 +235,56 @@ app.post(
     const base64Image = image.buffer.toString("base64");
     const dataUrl = `data:${image.mimetype};base64,${base64Image}`;
 
+    // Fixed: changed "passport" to "aadhaar" for correct instructions
+    const instructions = getAgentInstructions("aadhaar", pageNumber);
+    if (!instructions) {
+      return res.status(400).json({ error: "Invalid page number for aadhaar." });
+    }
+
     const agent = new Agent({
       name: "Aadhaar Extraction Agent",
-      instructions: getAgentInstructions("passport", pageNumber),
+      instructions: instructions,
       outputType:
         pageNumber === 1 ? aadhaarFirstPageOutput : aadhaarSecondPageOutput,
       model: "gpt-5-mini-2025-08-07",
     });
 
-    const { finalOutput } = await run(agent, [
-      user([
-        {
-          type: "input_text",
-          text: "Extract all available passport information from this image. Return only JSON with no additional text.",
-        },
-        {
-          type: "input_image",
-          image: dataUrl,
-          // @ts-ignore - OpenAI agents library type issue
-          // image_url: base64Image,
-        },
-      ]),
-    ]);
+    try {
+      const { finalOutput } = await run(agent, [
+        user([
+          {
+            type: "input_text",
+            text: "Extract all available aadhaar information from this image. Return only JSON with no additional text.",
+          },
+          {
+            type: "input_image",
+            image: dataUrl,
+          },
+        ]),
+      ]);
 
-    return res.json({
-      message: "Image extracted successfully",
-      data: finalOutput,
-    });
+      // Store extracted data in MongoDB
+      const extractedData = new ExtractedData({
+        documentType: 'aadhaar',
+        pageNumber: pageNumber,
+        extractedData: finalOutput,
+        imageUrl: dataUrl
+      });
+
+      await extractedData.save();
+
+      return res.json({
+        message: "Image extracted and stored successfully",
+        data: finalOutput,
+        mongoId: extractedData._id
+      });
+    } catch (error) {
+      console.error('Error processing image:', error);
+      return res.status(500).json({ 
+        error: "Failed to process image",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
   }
 );
 
@@ -248,25 +305,89 @@ app.post("/api/extract/pan-card", async (req: Request, res: Response) => {
     model: "gpt-5-mini-2025-08-07",
   });
 
-  const { finalOutput } = await run(agent, [
-    user([
-      {
-        type: "input_text",
-        text: "Extract all available passport information from this image. Return only JSON with no additional text.",
-      },
-      {
-        type: "input_image",
-        image: dataUrl,
-        // @ts-ignore - OpenAI agents library type issue
-        // image_url: base64Image,
-      },
-    ]),
-  ]);
+  try {
+    const { finalOutput } = await run(agent, [
+      user([
+        {
+          type: "input_text",
+          text: "Extract all available PAN card information from this image. Return only JSON with no additional text.",
+        },
+        {
+          type: "input_image",
+          image: dataUrl,
+        },
+      ]),
+    ]);
 
-  return res.json({
-    message: "Image extracted successfully",
-    data: finalOutput,
-  });
+    // Store extracted data in MongoDB
+    const extractedData = new ExtractedData({
+      documentType: 'pan-card',
+      pageNumber: 1,
+      extractedData: finalOutput,
+      imageUrl: dataUrl
+    });
+
+    await extractedData.save();
+
+    return res.json({
+      message: "Image extracted and stored successfully",
+      data: finalOutput,
+      mongoId: extractedData._id
+    });
+  } catch (error) {
+    console.error('Error processing image:', error);
+    return res.status(500).json({ 
+      error: "Failed to process image",
+      details: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+// Get all extracted data
+app.get("/api/extracted-data", async (req: Request, res: Response) => {
+  try {
+    const { documentType, pageNumber } = req.query;
+    
+    let query: any = {};
+    if (documentType) query.documentType = documentType;
+    if (pageNumber) query.pageNumber = Number(pageNumber);
+    
+    const data = await ExtractedData.find(query).sort({ createdAt: -1 });
+    
+    return res.json({
+      message: "Data retrieved successfully",
+      count: data.length,
+      data: data
+    });
+  } catch (error) {
+    console.error('Error retrieving data:', error);
+    return res.status(500).json({ 
+      error: "Failed to retrieve data",
+      details: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+// Get specific extracted data by ID
+app.get("/api/extracted-data/:id", async (req: Request, res: Response) => {
+  try {
+    const data = await ExtractedData.findById(req.params.id);
+    
+    if (!data) {
+      return res.status(404).json({ error: "Data not found" });
+    }
+    
+    return res.json({
+      message: "Data retrieved successfully",
+      data: data
+    });
+  } catch (error) {
+    console.error('Error retrieving data:', error);
+    return res.status(500).json({ 
+      error: "Failed to retrieve data",
+      details: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
 });
 
 // 404 handler
