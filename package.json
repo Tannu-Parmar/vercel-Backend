@@ -1,0 +1,39 @@
+{
+  "name": "image-extract-server",
+  "version": "1.0.0",
+  "description": "Express TypeScript server",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && node dist/index.js",
+    "dev": "nodemon src/index.ts",
+    "clean": "rimraf dist"
+  },
+  "keywords": [
+    "express",
+    "typescript",
+    "node"
+  ],
+  "author": "Vatsal Parmar",
+  "license": "ISC",
+  "dependencies": {
+    "@openai/agents": "^0.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "morgan": "^1.10.1",
+    "multer": "^2.0.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/morgan": "^1.9.10",
+    "@types/multer": "^2.0.0",
+    "nodemon": "^3.1.10",
+    "rimraf": "^6.0.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}
