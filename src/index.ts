@@ -8,7 +8,7 @@ import { z } from "zod";
 import { Agent, run, user } from "@openai/agents";
 
 const app: Application = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 5173;
 const upload = multer();
 
 // Middleware
