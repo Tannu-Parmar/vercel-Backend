@@ -6,12 +6,11 @@ import morgan from "morgan";
 import multer from "multer";
 import { z } from "zod";
 import { Agent, run, user } from "@openai/agents";
-
 const app: Application = express();
 const PORT = process.env.PORT || 3001;
 const upload = multer();
 
-// Middleware
+// Middlewares
 app.use(helmet()); // Security headers
 app.use(
   cors({
