@@ -25,10 +25,21 @@ try {
 
 // Middlewares
 app.use(helmet()); // Security headers
+const allowedOrigins = [
+  'https://vercel-frontend-feni.vercel.app',
+  'http://localhost:5173',
+];
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
-    credentials: true,
+    origin: function (origin, callback) {
+      console.log('Request Origin:', origin);
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.error('Blocked by CORS:', origin);
+        callback(new Error('Not allowed by CORS'));
+      }
+    }
   })
 ); // Enable CORS
 app.use(morgan("combined")); // Logging
