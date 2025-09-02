@@ -35,6 +35,7 @@ app.use(cors({
       console.error('Blocked by CORS:', origin);
       callback(new Error('Not allowed by CORS'));
     }
+    console.log('Request Origin:', origin);
   }
 }));
 
