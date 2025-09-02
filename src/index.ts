@@ -11,10 +11,10 @@ import User from "./model/User";
 import ExtractedData from "./model/ExtractedData"; // Fixed: removed .js extension
 
 const app: Application = express();
-app.use(cors());
 const PORT = process.env.PORT || 3001;
 const upload = multer();
 
+app.use(cors());
 
 // Connect to database
 try {
@@ -22,22 +22,6 @@ try {
 } catch (error) {
   console.error('Failed to connect to database:', error);
 }
-
-const allowedOrigins = [
-  'https://vercel-frontend-feni.vercel.app',
-  'http://localhost:5173'
-];
-app.use(cors({
-  origin: function (origin, callback) {
-    console.log('Request Origin:', origin);
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.error('Blocked by CORS:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  }
-}));
 
 // Middlewares
 app.use(helmet()); // Security headers
