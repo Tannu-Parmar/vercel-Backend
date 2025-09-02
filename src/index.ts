@@ -11,6 +11,7 @@ import User from "./model/User";
 import ExtractedData from "./model/ExtractedData"; // Fixed: removed .js extension
 
 const app: Application = express();
+app.use(cors());
 const PORT = process.env.PORT || 3001;
 const upload = multer();
 
