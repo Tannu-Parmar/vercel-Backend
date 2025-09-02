@@ -14,9 +14,21 @@ const app: Application = express();
 const PORT = process.env.PORT || 3001;
 const upload = multer();
 
+const allowedOrigins = [
+  'https://vercel-frontend-feni.vercel.app',
+  'http://localhost:5173'
+];
+
 app.use(cors({
-  origin: '*'
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
 }));
+
 
 // Connect to database
 try {
