@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 3001;
 const upload = multer();
 
 app.use(cors({
-  origin: 'https://vercel-frontend-feni.vercel.app'
+  origin: '*'
 }));
 
 // Connect to database
