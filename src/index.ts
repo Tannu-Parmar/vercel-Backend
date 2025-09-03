@@ -89,6 +89,7 @@ const passportBackPageInstructions = `You are an expert at extracting informatio
        Extrect following information from the passport's back page image: 
        - Father's Name
        - Mother's Name
+       - Spouse's Name
        - Address
        `;
 
@@ -145,6 +146,7 @@ const passportFirstPageOutput = z.object({
 const passportSecondPageOutput = z.object({
   fatherName: z.string().describe("father's name"),
   motherName: z.string().describe("mother's name"),
+  spouseName: z.string().describe("spouse's name"),
   address: z.string().describe("address"),
 });
 
